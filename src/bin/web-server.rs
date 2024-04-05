@@ -1,7 +1,5 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
-use std::thread;
-use std::time::Duration;
 use threadpool::ThreadPool;
 
 const MAX_THREAD_NUM: usize = 4;
