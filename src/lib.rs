@@ -1,5 +1,5 @@
-//! ThreadPool
-//! A ultra simple and lightweight thread pool implementation.
+//! # ThreadPool
+//! An ultra simple thread pool implementation in Rust.
 
 use log::{info, trace};
 use std::{
@@ -19,7 +19,22 @@ type JobType = Box<
 >;
 
 /// Thread Pool object.
+///
+/// Example:
+/// ```rust
+/// use threadpool::ThreadPool;
+/// # fn main() {
+/// let max_thread = 4;
+/// let tp = ThreadPool::new(max_thread);
+/// for id in 0..max_thread {
+///     tp.spawn(move || {
+///         println!("Thread {}", id);
+///     });
+/// }
+/// # }
+/// ```
 pub struct ThreadPool {
+    // Use `Option`, since we need to take the ownership when drop.
     job_sender: Option<Sender<JobType>>,
     workers: Vec<Worker>,
 }
@@ -37,7 +52,7 @@ impl ThreadPool {
         let receiver = Arc::new(Mutex::new(receiver));
 
         for id in 0..nthreads {
-            workers.push(Worker::new(id, Arc::clone(&receiver)));
+            workers.push(Worker::new(id, receiver.clone()));
         }
 
         ThreadPool {
@@ -46,6 +61,7 @@ impl ThreadPool {
         }
     }
 
+    /// Add job into the thread pool.
     pub fn spawn<F>(&self, f: F)
     where
         F: FnOnce() -> ThreadJobType // closure
@@ -62,7 +78,7 @@ impl Drop for ThreadPool {
         drop(self.job_sender.take());
         for worker in &mut self.workers {
             worker.thread.take().unwrap().join().unwrap();
-            trace!("drop worker {}", worker.id);
+            trace!("dropped worker {}", worker.id);
         }
     }
 }
@@ -83,7 +99,7 @@ impl Worker {
             let job = receiver.lock().unwrap().recv();
             match job {
                 Ok(job) => {
-                    info!("Thread {} is doing jobs...", &id);
+                    info!("Worker {} is doing jobs...", &id);
                     job();
                 }
                 _ => {
