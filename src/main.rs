@@ -7,6 +7,9 @@ use threadpool::ThreadPool;
 const MAX_THREAD_NUM: usize = 4;
 
 fn main() {
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Info)
+        .init();
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(MAX_THREAD_NUM);
 

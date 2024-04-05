@@ -1,6 +1,7 @@
 //! ThreadPool
 //! A ultra simple and lightweight thread pool implementation.
 
+use log::info;
 use std::{
     sync::{
         mpsc::{channel, Receiver, Sender},
@@ -65,7 +66,7 @@ impl Worker {
     fn new(id: usize, receiver: Arc<Mutex<Receiver<JobType>>>) -> Self {
         let thread = thread::spawn(move || loop {
             let job = receiver.lock().unwrap().recv().unwrap();
-            println!("Thread {} is doing jobs...", &id);
+            info!("Thread {} is doing jobs...", &id);
             job();
         });
         Worker { id, thread }
