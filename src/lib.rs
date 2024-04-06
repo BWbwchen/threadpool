@@ -17,6 +17,11 @@ type JobType = Box<
         + Send // safely pass the &mut closure between threads.
         + 'static, // we don't know how much time that this closure will execute.
 >;
+type ScopeJobType<'scope> = Box<
+    dyn FnOnce() -> ThreadJobType // closure
+        + Send // safely pass the &mut closure between threads.
+        + 'scope, // we don't know how much time that this closure will execute.
+>;
 
 /// Thread Pool object.
 ///
@@ -63,7 +68,7 @@ impl ThreadPool {
         }
     }
 
-    /// Add job into the thread pool.
+    /// Add job into the thread pool with `'static` lifetime.
     pub fn spawn<F>(&self, f: F)
     where
         F: FnOnce() -> ThreadJobType // closure
@@ -71,6 +76,17 @@ impl ThreadPool {
             + 'static, // we don't know how much time that this closure will execute.
     {
         self.job_sender.as_ref().unwrap().send(Box::new(f)).unwrap();
+    }
+
+    /// Add job into the thread pool with `'scope` lifetime.
+    pub fn scope_spawn<'scope, F>(&self, f: F)
+    where
+        F: FnOnce() -> ThreadJobType // closure
+            + Send // safely pass the &mut closure between threads.
+            + 'scope,
+    {
+        let job = unsafe { std::mem::transmute::<ScopeJobType<'scope>, JobType>(Box::new(f)) };
+        self.job_sender.as_ref().unwrap().send(job).unwrap();
     }
 }
 
@@ -151,6 +167,26 @@ mod tests {
         sleep(Duration::from_millis(main_sleep_time));
         assert_eq!(*counter.lock().unwrap(), max_thread);
     }
+
+    #[test]
+    fn scoped_thread_functional_test() {
+        let max_thread = 4;
+        let tp = ThreadPool::new(max_thread);
+        let mut v = [1, 2, 3, 4];
+        let expect = [2, 4, 6, 8];
+
+        for x in v.iter_mut() {
+            tp.scope_spawn(move || {
+                *x *= 2;
+            });
+        }
+        drop(tp);
+
+        for (result, expect) in v.iter().zip(expect) {
+            assert_eq!(*result, expect);
+        }
+    }
+
     #[test]
     fn drop_test() {
         env_logger::builder()
